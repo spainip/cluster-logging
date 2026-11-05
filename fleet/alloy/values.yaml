@@ -51,6 +51,7 @@ alloy:
       readOnly: true
     - name: positions
       mountPath: /var/lib/alloy
+  stabilityLevel: experimental
 controller:
   type: daemonset
   nodeSelector:
