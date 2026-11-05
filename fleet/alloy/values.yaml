@@ -13,7 +13,7 @@ alloy:
       fieldRef:
         fieldPath: spec.nodeName
   - name: LOG_NAMESPACE_FILTER
-    value: logging
+    value: .+
   configMap:
     create: false
     name: alloy-config
