@@ -9,3 +9,4 @@ helm:
   valuesFiles:
   - values.yaml
   timeoutSeconds: 600
+  disablePreProcess: true
