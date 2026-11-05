@@ -97,3 +97,43 @@ spec:
         summary: Logging persistent volume has less than 15 percent free
         description: Inspect the logging stack, Silo health and disk usage before
           changing retention or deleting data.
+    - alert: LoggingSiloRequestFailures
+      expr: sum(rate(loki_s3_request_duration_seconds_count{namespace="logging",status_code!~"2.."}[5m]))
+        > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Loki S3 operations are failing
+        description: Inspect logging delivery, Silo and shared disk capacity. Preserve
+          the data while diagnosing.
+    - alert: LoggingWALBacklog
+      expr: max(loki_write_wal_writer_last_written_timestamp{namespace="logging"})
+        - min(loki_write_last_read_timestamp{namespace="logging"}) > 120
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Alloy WAL reading is over two minutes behind
+        description: Inspect logging delivery, Silo and shared disk capacity. Preserve
+          the data while diagnosing.
+    - alert: LoggingWALDiskPressure
+      expr: loki_ingester_wal_disk_usage_percent{namespace="logging"} > 0.85
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Loki WAL filesystem is nearly full
+        description: Inspect logging delivery, Silo and shared disk capacity. Preserve
+          the data while diagnosing.
+    - alert: LoggingBucketBudget
+      expr: minio_cluster_usage_buckets_total_bytes{bucket="spainip-loki-data"} >
+        24 * 1024^3 or minio_cluster_usage_buckets_total_bytes{bucket="spainip-loki-rules"}
+        > 0.8 * 1024^3
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: Logging bucket exceeds 80 percent of its planning budget
+        description: Inspect logging delivery, Silo and shared disk capacity. Preserve
+          the data while diagnosing.

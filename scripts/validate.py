@@ -21,6 +21,10 @@ def render(component):
 
 def main():
     loki, alloy = render('loki'), render('alloy')
+    assert yaml.safe_load((ROOT / 'fleet/loki/fleet.yaml').read_text())['helm']['disablePreProcess'] is True
+    av = yaml.safe_load((ROOT / 'fleet/alloy/values.yaml').read_text())
+    assert av['alloy']['stabilityLevel'] == 'experimental'
+    assert next(e for e in av['alloy']['extraEnv'] if e['name'] == 'LOG_NAMESPACE_FILTER')['value'] == '.+'
     assert len([d for d in loki if d['kind'] == 'StatefulSet']) == 1
     assert len([d for d in alloy if d['kind'] == 'DaemonSet']) == 1
     for doc in loki + alloy:
