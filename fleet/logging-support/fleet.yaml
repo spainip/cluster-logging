@@ -1,0 +1,6 @@
+defaultNamespace: logging
+kustomize:
+  dir: .
+helm:
+  releaseName: cluster-logging-support
+  takeOwnership: true

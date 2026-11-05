@@ -1,0 +1,135 @@
+logging {
+  level = "info"
+  format = "logfmt"
+}
+
+discovery.kubernetes "pods" {
+  role = "pod"
+  selectors {
+    role = "pod"
+    field = "spec.nodeName=" + sys.env("NODE_NAME") + ",status.phase=Running"
+  }
+}
+
+discovery.relabel "pod_logs" {
+  targets = discovery.kubernetes.pods.targets
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    regex = sys.env("LOG_NAMESPACE_FILTER")
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label = "namespace"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label = "pod"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label = "container"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_node_name"]
+    target_label = "node"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label = "service_name"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+    regex = "(.+)"
+    target_label = "service_name"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+    separator = "/"
+    target_label = "__path__"
+    replacement = "/var/log/pods/*$1/*.log"
+  }
+}
+
+loki.source.file "pods" {
+  targets = discovery.relabel.pod_logs.output
+  forward_to = [loki.process.cri.receiver]
+  tail_from_end = true
+  file_match {
+    enabled = true
+    sync_period = "10s"
+  }
+}
+
+loki.process "cri" {
+  forward_to = [loki.process.redact.receiver]
+  stage.cri {}
+  stage.multiline {
+    firstline = "^\\S"
+    max_wait_time = "3s"
+    max_lines = 128
+  }
+  stage.label_drop {
+    values = ["filename"]
+  }
+  stage.static_labels {
+    values = { source = "kubernetes", cluster = "spainip-k3s" }
+  }
+}
+
+discovery.relabel "journal" {
+  targets = []
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label = "unit"
+  }
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label = "service_name"
+  }
+}
+
+loki.source.journal "host" {
+  forward_to = [loki.process.redact.receiver]
+  matches = "_SYSTEMD_UNIT=k3s.service _SYSTEMD_UNIT=nats-server.service"
+  max_age = "5m"
+  relabel_rules = discovery.relabel.journal.rules
+  labels = {
+    cluster = "spainip-k3s",
+    node = sys.env("NODE_NAME"),
+    source = "journal",
+  }
+}
+
+loki.process "redact" {
+  forward_to = [loki.write.local.receiver]
+  stage.replace {
+    expression = "(?i)(?:authorization|proxy-authorization)[\\\"']?\\s*[:=]\\s*[\\\"']?((?:Bearer|Basic)\\s+[A-Za-z0-9._~+/=-]+)"
+    replace = "[REDACTED]"
+  }
+  stage.replace {
+    expression = "(?i)(?:password|passwd|secret|access_token|refresh_token|api_key|token)[\\\"']?\\s*[:=]\\s*[\\\"']?([^\\s\\\"',}]+)"
+    replace = "[REDACTED]"
+  }
+  stage.replace {
+    expression = "(?i)(?:set-cookie|cookie)[\\\"']?\\s*[:=]\\s*[\\\"']?([^\\r\\n\\\"]+)"
+    replace = "[REDACTED]"
+  }
+}
+
+loki.write "local" {
+  max_streams = 15000
+  endpoint {
+    url = "http://loki.logging.svc.cluster.local:3100/loki/api/v1/push"
+    batch_size = "256KiB"
+    batch_wait = "1s"
+    min_backoff_period = "1s"
+    max_backoff_period = "30s"
+    max_backoff_retries = 10
+  }
+  wal {
+    enabled = true
+    max_segment_age = "15m"
+    drain_timeout = "30s"
+  }
+}

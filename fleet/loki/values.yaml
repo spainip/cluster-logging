@@ -1,0 +1,154 @@
+fullnameOverride: loki
+deploymentMode: Monolithic
+gateway:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
+sidecar:
+  rules:
+    enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+loki:
+  auth_enabled: false
+  image:
+    tag: 3.7.9
+    digest: sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+  commonConfig:
+    replication_factor: 1
+  schemaConfig:
+    configs:
+    - from: '2026-11-01'
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+  storage:
+    type: s3
+    bucketNames:
+      chunks: spainip-loki-data
+      ruler: spainip-loki-rules
+    s3:
+      endpoint: silo.silo.svc.cluster.local:9000
+      region: us-east-1
+      accessKeyId: ${AWS_ACCESS_KEY_ID}
+      secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+      s3ForcePathStyle: true
+      insecure: true
+      signatureVersion: v4
+  limits_config:
+    retention_period: 336h
+    ingestion_rate_mb: 2
+    ingestion_burst_size_mb: 4
+    max_global_streams_per_user: 15000
+    max_line_size: 256KB
+    max_line_size_truncate: true
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    query_timeout: 60s
+    max_query_lookback: 336h
+    max_query_length: 337h
+    max_entries_limit_per_query: 5000
+    split_queries_by_interval: 15m
+    allow_structured_metadata: true
+    volume_enabled: true
+  compactor:
+    working_directory: /var/loki/compactor
+    compaction_interval: 10m
+    retention_enabled: true
+    retention_delete_delay: 2h
+    retention_delete_worker_count: 4
+    delete_request_store: s3
+    delete_request_store_key_prefix: delete-requests/
+  querier:
+    max_concurrent: 2
+  ingester:
+    chunk_idle_period: 5m
+    max_chunk_age: 1h
+    wal:
+      enabled: true
+      dir: /var/loki/wal
+      flush_on_shutdown: true
+  rulerConfig:
+    enable_api: false
+  analytics:
+    reporting_enabled: false
+singleBinary:
+  replicas: 1
+  sidecar: false
+  extraArgs: []
+  extraEnvFrom:
+  - secretRef:
+      name: loki-s3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: '2'
+      memory: 3Gi
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: logging-local
+    enableStatefulSetAutoDeletePVC: false
+    whenDeleted: Retain
+    whenScaled: Retain
+  nodeSelector:
+    kubernetes.io/hostname: spainip-k3s
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    labels:
+      release: kube-prometheus-stack
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+ingester:
+  replicas: 0
+distributor:
+  replicas: 0
+querier:
+  replicas: 0
+queryFrontend:
+  replicas: 0
+queryScheduler:
+  replicas: 0
+indexGateway:
+  replicas: 0
+compactor:
+  replicas: 0
+bloomGateway:
+  replicas: 0
+bloomPlanner:
+  replicas: 0
+bloomBuilder:
+  replicas: 0
+patternIngester:
+  replicas: 0
+ruler:
+  replicas: 0
+rulerQuerier:
+  replicas: 0
+rulerQueryFrontend:
+  replicas: 0
+rulerQueryScheduler:
+  replicas: 0
+overridesExporter:
+  replicas: 0
+rbac:
+  pspEnabled: false
+  sccEnabled: false
+  namespaced: true
+serviceAccount:
+  automountServiceAccountToken: false

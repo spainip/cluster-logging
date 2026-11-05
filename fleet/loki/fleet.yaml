@@ -1,0 +1,11 @@
+defaultNamespace: logging
+dependsOn:
+- name: cluster-logging-fleet-logging-support
+helm:
+  repo: https://grafana-community.github.io/helm-charts
+  chart: loki
+  version: 21.0.0
+  releaseName: loki
+  valuesFiles:
+  - values.yaml
+  timeoutSeconds: 600

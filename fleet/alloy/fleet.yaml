@@ -1,0 +1,11 @@
+defaultNamespace: logging
+dependsOn:
+- name: cluster-logging-fleet-loki
+helm:
+  repo: https://grafana.github.io/helm-charts
+  chart: alloy
+  version: 1.15.0
+  releaseName: alloy
+  valuesFiles:
+  - values.yaml
+  timeoutSeconds: 600

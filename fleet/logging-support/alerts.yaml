@@ -1,0 +1,99 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cluster-logging
+  namespace: cattle-monitoring-system
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: cluster-logging
+    rules:
+    - alert: LoggingLokiUnavailable
+      expr: up{namespace="logging",service="loki"} == 0 or absent(up{namespace="logging",service="loki"})
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: Loki scrape target is unavailable
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingAlloyUnavailable
+      expr: up{namespace="logging",service="alloy"} == 0 or absent(up{namespace="logging",service="alloy"})
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Alloy scrape target is unavailable
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingEntriesDropped
+      expr: sum(increase(loki_write_dropped_entries_total{namespace="logging"}[10m]))
+        > 0
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: Alloy dropped log entries
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingDeliveryRetries
+      expr: sum(rate(loki_write_batch_retries_total{namespace="logging"}[5m])) > 0
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Alloy repeatedly retries delivery
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingLokiServerErrors
+      expr: sum(rate(loki_request_duration_seconds_count{namespace="logging",status_code=~"5.."}[5m]))
+        > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Loki requests are failing
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingPodRestarts
+      expr: sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace="logging"}[15m]))
+        > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Logging container is repeatedly restarting
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingMemoryPressure
+      expr: sum by (namespace,pod,container) (container_memory_working_set_bytes{namespace="logging",container!="",container!="POD"})
+        / on (namespace,pod,container) sum by (namespace,pod,container) (kube_pod_container_resource_limits{namespace="logging",resource="memory"})
+        > 0.9
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Logging container is close to its memory limit
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingHostDiskLow
+      expr: node_filesystem_avail_bytes{mountpoint="/",fstype="ext4"} / node_filesystem_size_bytes{mountpoint="/",fstype="ext4"}
+        < 0.15
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Shared server disk has less than 15 percent free
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
+    - alert: LoggingVolumeLow
+      expr: kubelet_volume_stats_available_bytes{namespace="logging"} / kubelet_volume_stats_capacity_bytes{namespace="logging"}
+        < 0.15
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Logging persistent volume has less than 15 percent free
+        description: Inspect the logging stack, Silo health and disk usage before
+          changing retention or deleting data.
